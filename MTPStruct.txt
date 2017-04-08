@@ -1,0 +1,59 @@
+## Shadow The Hedgehog
+## .MTP, "MotionPackage"?
+## Struct detail by Sewer56lol
+
+>> HEADER <<
+Unknown #1 (Activator?) | 2 bytes
+Animation Count 	 | 2 bytes
+Unknown #2 (Activator?) | 2 bytes 
+Padding 			 | 0xA bytes 
+
+>> DATA INFO/OFFSET TABLE (Starting at 0x10), This repeats for Animation Count Entries <<
+
+Unknown #3 (Potentially Important) | 4 Bytes(edited)
+Animation Name Offset | 4 Bytes
+Animation Size Offset | 4 Bytes
+
+>> ANIMATION ENTRY (FROM OFFSET) << 
+Animation Start | 0x0
+Animation Size | 0x8, 4 Bytes (necessary for extraction, length of .anm)
+
+>> ANIMATION NAME ENTRY (FROM OFFSET) <<
+Object Name (no extension) | String, Variable Length, Delimited/Finished by \x00
+
+----------------
+Note:
+
+Unknown #3 is an offset leads to a set of values. 
+It appears to be some sort of set of properties, which are always almost the same.
+The entries are two 4 Byte values.
+Separated by 0x8 Bytes.
+Not all animations have an entry for this.
+
+First Value always seems to lead to the first animation name offset.
+This is 0x20;
+
+Second Value seems to lead to an unknown section, which may contain data.
+This is immediately after the last file;
+This section always ends with "FF";
+This is typically 276 Bytes long from Normal, sometimes shorter and sometimes nonexistant;
+I believe to do with control/following of the 2P (or "2nd controller") character.
+
+///---
+But Maria has 84 Bytes... And 41 40 where Sonic 40 40
+And Charmy Doesn't even have this section...
+///---
+
+Second value has typical diffs between chars:
+Base Difference: 0x38 + Every 0x60 | Short
+Example: 
+	Sonic | 40 00
+	Amy   | 3F 80
+	Knux  | 40 80
+	Maria | N/A Short section.
+	Bee   | Doesn't even have this.
+
+Third Values (99% Time): 00 01 00 04 00 00 FF FF
+----------------
+
+This should be enough to write an unpacker/repacker, which is what I'm doing this very moment.
