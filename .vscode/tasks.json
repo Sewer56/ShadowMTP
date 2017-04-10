@@ -4,6 +4,6 @@
     "version": "0.1.0",
     "command": "g++",
     "isShellCommand": true,
-    "args": ["ShadowMTPDec.cpp", "-std=c++11", "--static" ,"-o", "ShadowMTP.exe"],
+    "args": ["ShadowMTPDec.cpp", "-std=c++11", "--static", "-g" ,"-o", "ShadowMTP.exe"],
     "showOutput": "always"
 }

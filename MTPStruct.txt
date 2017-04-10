@@ -10,7 +10,11 @@ Padding 			 | 0xA bytes
 
 >> DATA INFO/OFFSET TABLE (Starting at 0x10), This repeats for Animation Count Entries <<
 
-Unknown #3 (Potentially Important) | 4 Bytes(edited)
+Object Property Offset | 4 Bytes ## THIS IS AN OFFSET TO BEGINNING OF THE PREVIOUS! PROPERTY.
+							     ## FOR THE FIRST PROPERTY, IT IS THE LENGTH OF THE SPECIFIC PROPERTY AT START OF MISC PROPERTIES.
+								 ## WTF SANIC TEEM, THIS FORMAT IS A CLUSTERFUCK TO PROPERLY UNPACK/PACK. HOW DO YOU EVEN READ THIS YOURSELF
+								 ## HAVE TO SHIFT ALL ENTRIES BY 1 AND RESOLVE LAST TWO MANUALLY -.-
+								 ## See Extra Notes for some insight!
 Animation Name Offset | 4 Bytes
 Animation Size Offset | 4 Bytes
 
@@ -27,11 +31,12 @@ Note:
 Unknown #3 is an offset leads to a set of values. 
 It appears to be some sort of set of properties, which are always almost the same.
 The entries are two 4 Byte values.
-Separated by 0x8 Bytes.
+Typically separated by 0x8 Bytes.
 Not all animations have an entry for this.
 
 First Value always seems to lead to the first animation name offset.
-This is 0x20;
+This is 0x20; I'm assuming this to be an offset from the END of the file.
+Edit: Changing this, actually it's likely to be length of 1st entry.
 
 Second Value seems to lead to an unknown section, which may contain data.
 This is immediately after the last file;
