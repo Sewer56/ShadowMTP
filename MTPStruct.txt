@@ -3,9 +3,9 @@
 ## Struct detail by Sewer56lol
 
 >> HEADER <<
-Unknown #1 (Activator?) | 2 bytes
+Unknown #1 (Activator?) | 2 bytes   (Generally 00 01)
 Animation Count 	 | 2 bytes
-Unknown #2 (Activator?) | 2 bytes 
+Unknown #2 (Activator?) | 2 bytes   (Generally 00 01)
 Padding 			 | 0xA bytes 
 
 >> DATA INFO/OFFSET TABLE (Starting at 0x10), This repeats for Animation Count Entries <<
@@ -15,6 +15,9 @@ Object Property Offset | 4 Bytes ## THIS IS AN OFFSET TO BEGINNING OF THE PREVIO
 								 ## WTF SANIC TEEM, THIS FORMAT IS A CLUSTERFUCK TO PROPERLY UNPACK/PACK. HOW DO YOU EVEN READ THIS YOURSELF
 								 ## HAVE TO SHIFT ALL ENTRIES BY 1 AND RESOLVE LAST TWO MANUALLY -.-
 								 ## See Extra Notes for some insight!
+								 
+								 ## Edit: Seems I was wrong, it's just that the first entry is 'special' in unprecendented ways!
+								 ## It's even padded with 00 00 00 00 at the end.
 Animation Name Offset | 4 Bytes
 Animation Size Offset | 4 Bytes
 
@@ -23,7 +26,8 @@ Animation Start | 0x0
 Animation Size | 0x8, 4 Bytes (necessary for extraction, length of .anm)
 
 >> ANIMATION NAME ENTRY (FROM OFFSET) <<
-Object Name (no extension) | String, Variable Length, Delimited/Finished by \x00
+Object Name (no extension) | String, Variable Length, Delimited/Finished by \x00 (s)
+							 ## May not be necessary, but total length + delimiters is always a multiple of 0x4 Byte(s)
 
 ----------------
 Note:

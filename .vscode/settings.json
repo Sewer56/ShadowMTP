@@ -7,6 +7,10 @@
         "iostream": "cpp",
         "*.tcc": "cpp",
         "iosfwd": "cpp",
-        "limits": "cpp"
+        "limits": "cpp",
+        "istream": "cpp",
+        "fstream": "cpp",
+        "ostream": "cpp",
+        "system_error": "cpp"
     }
 }

@@ -42,6 +42,9 @@ class ShadowANMObject
 		// Animation Name, obtained from the Animation Name Offset
 		string AnimationName;
 
+		// Animation Property name, this is a file name, only used for repacking!
+		string AnimationPropertyName;
+
 		// Animation Size, obtained from the Animation Offset
 		unsigned int AnimationDataSize;
 
@@ -59,6 +62,33 @@ class ShadowANMObject
 		// Unknown Value
 		unsigned int AnimationPropertyOffset;
 };
+
+int16_t LittleToBigEndian16(int16_t val)
+{
+    return (val << 8) |          // left-shift always fills with zeros
+          ((val >> 8) & 0x00ff); // right-shift sign-extends, so force to zero
+}
+
+int32_t LittleToBigEndian32(int32_t val)
+{
+    return (val << 24) |
+          ((val <<  8) & 0x00ff0000) |
+          ((val >>  8) & 0x0000ff00) |
+          ((val >> 24) & 0x000000ff);
+}
+
+/* Literally name of method, as on the tin */
+bool StringHasEnding (string const &fullString, string const &ending) 
+{
+    if (fullString.length() >= ending.length()) 
+	{
+       	return (0 == fullString.compare (fullString.length() - ending.length(), ending.length(), ending));
+    } 
+	else 
+	{
+        return false;
+    }
+}
 
 void MTPToANM(string InputFile, string OutputFile) {
 
@@ -302,7 +332,7 @@ void MTPToANM(string InputFile, string OutputFile) {
 			// Go up incrementing bytes until FF FF
 			if ( DelimiterTest1 == 0xFF && DelimiterTest2 == 0xFF )
 			{
-				ShadowObjects[x].AnimationPropertySize = ObjectLength; // Delcare new length for current object.
+				ShadowObjects[x].AnimationPropertySize = ObjectLength; // Declare new length for current object.
 				ShadowObjects[x+1].AnimationPropertyOffset = ShadowObjects[x].AnimationPropertyOffset + ShadowObjects[x].AnimationPropertySize; // Set offset of next to one of previous + length. 
 				break;
 			}
@@ -411,6 +441,139 @@ void MTPToANM(string InputFile, string OutputFile) {
 	ANMDecTextFile.close(); // Close.
 }
 
+
+// --------------------
+
+void FolderToMTP(string InputFile, string OutputFile)
+{
+	
+	// File to be written.
+	vector<char> MTPFileData;
+	// Objects to be written.
+	vector<ShadowANMObject> ShadowObjects;
+	// Input File TXT.
+	string TXTArchivePropertiesFile = InputFile + "/ShadowMTPDec.txt";
+	// Input file stream to read the individual files.
+	ifstream FileReader; 
+
+	// Just for storing individual bytes, makes my head feel more comfortable.
+	char* TwoByteBuffer; TwoByteBuffer = new char[2];
+	char* FourByteBuffer; FourByteBuffer = new char[4];
+	char* EightByteBuffer; EightByteBuffer = new char[8];
+
+	// Variables for reading the definition of text file.
+	string CurrentLine;		// Current Line of Text file.
+	unsigned short int AnimationEntries = 0; // Incremented when a file with .STHAnim is found.
+	unsigned int AnimationProperties = 0; // Incremented when a file with .STHAnimProperty is found.
+	vector<string> ObjectNameStrings; // Stores the strings of all of the object names.
+	vector<string> ObjectPropertyStrings; // Stores the strings of all of the object properties.
+
+	// First we are going to calculate the amount of entries for animations we are going to have.
+	FileReader.open(TXTArchivePropertiesFile);
+	while( getline(FileReader,CurrentLine) )
+	{
+		// If string ends correctly
+		if ( StringHasEnding(CurrentLine , ".STHAnim") )
+		{
+			// Create temporary empty object.
+			ShadowANMObject* TemporaryObject = new ShadowANMObject();
+			// Push the string of the name of the current object off to the vector of strings.
+			ObjectNameStrings.push_back(CurrentLine);
+			// Push the temporary object into the vector.
+			ShadowObjects.push_back( *(ShadowANMObject *)TemporaryObject );
+			// Add an entry to the complete total of animation entries.
+			AnimationEntries = AnimationEntries + 1;
+		}
+		else if ( StringHasEnding(CurrentLine , ".STHAnimProperty") )
+		{ 
+			// => Do not repeat object creation here, a property cannot exist without an anim.
+			// => Anim count will already be set by STHAnim files.
+			ObjectPropertyStrings.push_back(CurrentLine);
+		}
+	}
+	FileReader.close();
+
+	// Iterate through all objects, add the file object properties to the appropriate object.
+	for (unsigned int x = 0; x < ShadowObjects.size(); x++)
+	{		
+		// Set Name of Animation //
+		ShadowObjects[x].AnimationName = ObjectNameStrings[x];
+		
+		// Open File Temporarily //
+		FileReader.open(InputFile + "/" + ShadowObjects[x].AnimationName, ios::binary); // Open the file
+		FileReader.seekg(0, ios::end); // Set the pointer to the end
+		unsigned int TempFileSize = FileReader.tellg(); // Get the pointer location
+		
+		ShadowObjects[x].AnimationDataSize = TempFileSize; // Set the data size of the file.
+		FileReader.close(); // Closé
+
+		for (unsigned int y = 0; y < ObjectPropertyStrings.size(); y++)
+		{
+			string StripProperty = ObjectPropertyStrings[y]; // Declare Property Name String
+			StripProperty =  StripProperty.substr(0, StripProperty.size() - 8); // Strip "Property from Name"
+			
+			if (ShadowObjects[x].AnimationName == StripProperty) // If property animation name matches animation name, add it to the object.
+			{
+				// Open Property File Temporarily //
+				FileReader.open(InputFile + "/" + ObjectPropertyStrings[y], ios::binary); // Open the file
+				FileReader.seekg(0, ios::end); // Set the pointer to the end
+				unsigned int TempPropertyFileSize = FileReader.tellg(); // Get pointer location
+				ShadowObjects[x].AnimationPropertyName = ObjectPropertyStrings[y]; // Pass the file name into the object.
+				ShadowObjects[x].AnimationPropertySize = TempPropertyFileSize; // Set the property size
+				FileReader.close(); // Close the file
+			}
+		}
+		cout << "Property Name: " << ShadowObjects[x].AnimationName << " || " << ShadowObjects[x].AnimationPropertySize << " || " << ShadowObjects[x].AnimationDataSize << endl;
+	}
+
+	/* Writing to the MTP File */
+
+	// Writer to new MTP file.
+	ofstream FileWriter(OutputFile, ios::binary);
+	// Check if file successfully written.
+	if (FileWriter.is_open()) { cout << "File successfully created for writing.\n" << endl; } else { cout << "File failed to open for writing" << endl; std::exit; }
+	// Activator for header
+	unsigned const short MTPArchiveActivator = 0x01;
+	unsigned const short MTPArchiveActivatorBigEndian = LittleToBigEndian16(MTPArchiveActivator);
+	unsigned const short AnimationEntriesBigEndian = LittleToBigEndian16(AnimationEntries);
+	unsigned const short AnimationInfoEntryOffset = 12;
+	unsigned const short HeaderNullBytes = 0x00;
+
+	// Time to write the file header //
+	FileWriter.write( (char*)&MTPArchiveActivatorBigEndian, 2 ); // Activator 1 
+	FileWriter.write( (char*)&AnimationEntriesBigEndian, 2 ); // Animation Entries
+	FileWriter.write( (char*)&MTPArchiveActivatorBigEndian, 2 ); // Activator 2
+	for (unsigned char x = 0; x < 10; x++) // Write 0xA bytes of padding.
+	{
+		FileWriter.write( (char*)&HeaderNullBytes, 1 ); 
+	}
+
+	/* Calculate the File Format Offsets Before Writing */
+	cout << 16 + (12*158) << endl;
+
+	// Write the file entries //
+	for (unsigned short x = 0; x < AnimationEntries; x++)
+	{
+		// NULL ATM
+	}
+	
+	for (unsigned int x = 0; x < ShadowObjects.size(); x++)
+	{
+		cout << "Object: " << x << endl;
+		cout << "----------" << endl;
+		cout << "File Name: " << ShadowObjects[x].AnimationName << endl;
+		cout << "Property Name: " << ShadowObjects[x].AnimationPropertyName << endl;
+		cout << "File Name Offset: " << ShadowObjects[x].AnimationNameOffset << endl;
+		cout << "File Data Offset: " << ShadowObjects[x].AnimationDataOffset << endl;
+		cout << "File Data Size: " << ShadowObjects[x].AnimationDataSize << endl;
+		cout << "File Property Size: " << ShadowObjects[x].AnimationPropertySize << endl;
+		cout << endl;
+	}
+	
+}
+
+// --------------------
+
 int main(int argc, char ** argv)
 {
 	string InputFile; //Input file
@@ -427,7 +590,7 @@ int main(int argc, char ** argv)
 	}
 
 	if (Action == 1) { MTPToANM(InputFile, OutputFile); }
-	else if (Action == 2) { ANMToMTP(InputFile, OutputFile); } // Do Nothing
+	else if (Action == 2) { FolderToMTP(InputFile, OutputFile); } // Do Nothing
 	else
 	{
 		cout << "\n\nYou have not specified an action. Try running with parameters:" << endl;
