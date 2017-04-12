@@ -42,9 +42,6 @@ class ShadowANMObject
 		// Animation Name, obtained from the Animation Name Offset
 		string AnimationName;
 
-		// Animation Property name, this is a file name, only used for repacking!
-		string AnimationPropertyName;
-
 		// Animation Size, obtained from the Animation Offset
 		unsigned int AnimationDataSize;
 
@@ -52,6 +49,7 @@ class ShadowANMObject
 		unsigned int AnimationPropertySize = 0;
 
 		/* --------------------------------------------------------------- */
+		// OFFSETS
 
 		// Offset where the animation size will be contained. (at 0x8 offset)
 		unsigned int AnimationDataOffset;
@@ -61,7 +59,28 @@ class ShadowANMObject
 
 		// Unknown Value
 		unsigned int AnimationPropertyOffset;
+
+		/* --------------------------------------------------------------- */
+		// ONLY FOR REPACK
+
+		// Animation Property name, this is a file name, only used for repacking! (2nd Struct Section of Name Tables!)
+		string AnimationPropertyName;
+
+		// Null bytes for 4 byte alignment performed in the format, null. Used only for repacking! (2nd Struct Section of Name Tables!)
+		unsigned short int AnimationNameNullBytes = 0;
+
+		// Absolute Animation Name Length for repacking
+		unsigned short int AnimationNameLength = 0;
+
+		// Animation Name raw
+		string AnimationNameRaw;
 };
+
+bool DoesFileExist(string fileName)
+{
+    std::ifstream infile(fileName);
+    return infile.good();
+}
 
 int16_t LittleToBigEndian16(int16_t val)
 {
@@ -75,6 +94,29 @@ int32_t LittleToBigEndian32(int32_t val)
           ((val <<  8) & 0x00ff0000) |
           ((val >>  8) & 0x0000ff00) |
           ((val >> 24) & 0x000000ff);
+}
+
+unsigned short int GetStringNullBytes(string StringMeme)
+{
+	if (StringMeme.length() == 0) { return 0; }
+	unsigned short int NullByteCount = 0;
+	unsigned short int StringLength = StringMeme.length();
+
+	for (unsigned int x = 0; x < 4; x++)
+	{
+		unsigned short NotDivisibleByFourInitial = StringLength % 4;
+		unsigned short NotDivisibleByFourNew = (StringLength + NullByteCount) % 4; 
+	    if (NotDivisibleByFourInitial == 0 && x == 0) // Even if divisible by 4, MTP pads it with 4 bytes anyway.
+		{
+			NullByteCount += 1;
+		}
+		else if ( NotDivisibleByFourNew != 0) // If not divisible by 4, add 1.
+		{
+			NullByteCount += 1;
+		}
+		else { break; }
+	}
+	return NullByteCount;
 }
 
 /* Literally name of method, as on the tin */
@@ -533,43 +575,195 @@ void FolderToMTP(string InputFile, string OutputFile)
 	// Check if file successfully written.
 	if (FileWriter.is_open()) { cout << "File successfully created for writing.\n" << endl; } else { cout << "File failed to open for writing" << endl; std::exit; }
 	// Activator for header
+	AnimationEntries += 1; // Part of the hacky implementation, see below!
 	unsigned const short MTPArchiveActivator = 0x01;
 	unsigned const short MTPArchiveActivatorBigEndian = LittleToBigEndian16(MTPArchiveActivator);
-	unsigned const short AnimationEntriesBigEndian = LittleToBigEndian16(AnimationEntries);
 	unsigned const short AnimationInfoEntryOffset = 12;
 	unsigned const short HeaderNullBytes = 0x00;
-
-	// Time to write the file header //
-	FileWriter.write( (char*)&MTPArchiveActivatorBigEndian, 2 ); // Activator 1 
-	FileWriter.write( (char*)&AnimationEntriesBigEndian, 2 ); // Animation Entries
-	FileWriter.write( (char*)&MTPArchiveActivatorBigEndian, 2 ); // Activator 2
-	for (unsigned char x = 0; x < 10; x++) // Write 0xA bytes of padding.
-	{
-		FileWriter.write( (char*)&HeaderNullBytes, 1 ); 
-	}
+	unsigned const short AnimationInfoTableStart = 8;
+	unsigned int NameSectionStart = 0;
+	unsigned int DataSectionStart = 0;
+	unsigned int PropertySectionStart = 0;
 
 	/* Calculate the File Format Offsets Before Writing */
-	cout << 16 + (12*158) << endl;
 
-	// Write the file entries //
-	for (unsigned short x = 0; x < AnimationEntries; x++)
-	{
-		// NULL ATM
-	}
+	/* Starting off With a HACKY Implementation to fix a HACKY implementation, god bless! */
+	ShadowANMObject* TemporaryObjectX = new ShadowANMObject();
+	TemporaryObjectX->AnimationPropertySize = ShadowObjects[0].AnimationPropertySize;
+	TemporaryObjectX->AnimationPropertyName = ShadowObjects[0].AnimationPropertyName;
+	ShadowObjects[0].AnimationPropertySize = 0;
+	ShadowObjects[0].AnimationPropertyName = "";
+	TemporaryObjectX->AnimationDataOffset = 0;
+	TemporaryObjectX->AnimationNameOffset = 0;
+	TemporaryObjectX->AnimationDataSize = 0;
+	ShadowObjects.insert( ShadowObjects.begin(), *(ShadowANMObject *)TemporaryObjectX );
 	
+	/* We can start calculating the offsets now */
+	NameSectionStart = (AnimationInfoEntryOffset * AnimationEntries) + AnimationInfoTableStart;
+
+	cout << "Calculating Data Offsets: " << endl;
+	cout << "---------------------------" << endl;
+	
+	// Let's get the 4 byte alignment of nulls the file names first though!
+	for (unsigned int x = 0; x < AnimationEntries; x++)
+	{
+		// Animation Name Offset ✔
+		// Animation Size 
+		//
+
+		cout << "---------" << endl;
+		cout << "Object: " << x << endl;
+		cout << "---------" << endl;
+		ShadowObjects[x].AnimationNameNullBytes = GetStringNullBytes( ShadowObjects[x].AnimationName.substr(0, ShadowObjects[x].AnimationName.size() - 8) );
+		cout << "Object Name: " << ShadowObjects[x].AnimationName.substr(0, ShadowObjects[x].AnimationName.size() - 8) << endl;
+		cout << "Object Null Bytes: " << ShadowObjects[x].AnimationNameNullBytes << endl;
+
+
+		/* Calculating Name Lengths! */
+		if ( ShadowObjects[x].AnimationName.length() < 9) { } // Do Nothing if the animation name length is null
+		else 
+		{ 
+			ShadowObjects[x].AnimationNameRaw = ShadowObjects[x].AnimationName.substr(0, ShadowObjects[x].AnimationName.size() - 8); // Set raw anim name,
+			ShadowObjects[x].AnimationNameLength = ShadowObjects[x].AnimationName.length() - 8; // Do NOT put this below in the else statement, things'll break!
+		} 
+
+		/* Calculating Name Offsets! */
+		if (x == 0) { ShadowObjects[x].AnimationNameOffset = NameSectionStart; }
+													// Last string's offset                      // Length of name				// Remove extension 			// Add null bytes
+		else { ShadowObjects[x].AnimationNameOffset = ShadowObjects[x - 1].AnimationNameOffset +  ShadowObjects[x - 1].AnimationNameLength + ShadowObjects[x - 1].AnimationNameNullBytes; }
+	}
+
+	DataSectionStart = ShadowObjects[AnimationEntries - 1].AnimationNameOffset + ShadowObjects[AnimationEntries - 1].AnimationNameLength + ShadowObjects[AnimationEntries - 1].AnimationNameNullBytes;
+
+	for (unsigned int x = 0; x < AnimationEntries; x++)
+	{
+		/* Calculating Data Offsets! */
+		if (x == 0) { ShadowObjects[x].AnimationDataOffset = DataSectionStart; }
+													
+		else { ShadowObjects[x].AnimationDataOffset = ShadowObjects[x - 1].AnimationDataOffset + ShadowObjects[x - 1].AnimationDataSize; }
+	}
+
+	PropertySectionStart = ShadowObjects[AnimationEntries - 1].AnimationDataOffset + ShadowObjects[AnimationEntries - 1].AnimationDataSize;
+
+	for (unsigned int x = 0; x < AnimationEntries; x++)
+	{
+		/* Calculating Data Offsets! */
+		if (x == 0) { ShadowObjects[x].AnimationPropertyOffset = PropertySectionStart; }
+													
+		else { ShadowObjects[x].AnimationPropertyOffset = ShadowObjects[x - 1].AnimationPropertyOffset + ShadowObjects[x - 1].AnimationPropertySize; }
+	}
+
+	/* Wiping offsets where length == 0 */
+	/* We do not allocate space in table to null offsets */
+	for (unsigned int x = 0; x < AnimationEntries; x++)
+	{
+		if (ShadowObjects[x].AnimationDataSize == 0) { ShadowObjects[x].AnimationDataOffset = 0; }
+		if (ShadowObjects[x].AnimationNameLength == 0) { ShadowObjects[x].AnimationNameOffset = 0; }
+		if (ShadowObjects[x].AnimationPropertySize == 0) { ShadowObjects[x].AnimationPropertyOffset = 0; }		
+	}
+
+	cout << endl;
+	cout << "Displaying To Be Packed File Data!" << endl;
+	cout << "----------------------------------" << endl;
+
 	for (unsigned int x = 0; x < ShadowObjects.size(); x++)
 	{
 		cout << "Object: " << x << endl;
 		cout << "----------" << endl;
 		cout << "File Name: " << ShadowObjects[x].AnimationName << endl;
+		cout << "File Name Raw: " << ShadowObjects[x].AnimationNameRaw << endl;
 		cout << "Property Name: " << ShadowObjects[x].AnimationPropertyName << endl;
 		cout << "File Name Offset: " << ShadowObjects[x].AnimationNameOffset << endl;
+		cout << "File Name Length: " << ShadowObjects[x].AnimationNameLength << endl;
+		cout << "File Name Null Bytes: " << ShadowObjects[x].AnimationNameNullBytes << endl;
 		cout << "File Data Offset: " << ShadowObjects[x].AnimationDataOffset << endl;
 		cout << "File Data Size: " << ShadowObjects[x].AnimationDataSize << endl;
+		cout << "File Property Offset: " << ShadowObjects[x].AnimationPropertyOffset << endl;
 		cout << "File Property Size: " << ShadowObjects[x].AnimationPropertySize << endl;
 		cout << endl;
 	}
+
+	cout << "Packing!" << endl;
+	cout << "--------" << endl;
+
+	cout << "\n=> Writing File Header!" << endl;
+	// Time to write the file header //
+	unsigned short AnimationEntriesBigEndian = LittleToBigEndian16(AnimationEntries - 1); 
 	
+	// The archive format doesn't treat the first entry as an actual animation, despite having data offset for its property.
+	FileWriter.write( (char*)&MTPArchiveActivatorBigEndian, 2 ); // Activator 1 
+	FileWriter.write( (char*)&AnimationEntriesBigEndian, 2 ); // Animation Entries
+	FileWriter.write( (char*)&MTPArchiveActivatorBigEndian, 2 ); // Activator 2
+	FileWriter.write( (char*)&HeaderNullBytes, 1 ); // Null x1
+	FileWriter.write( (char*)&HeaderNullBytes, 1 ); // Null x2
+
+	cout << "=> Writing File Entries In Table!" << endl;
+	// Write the file entries to the table //
+	ShadowObjects[0].AnimationPropertyOffset = ShadowObjects[0].AnimationPropertySize; // One final fix, first entry uses size instead of offset for the property offset, IDK why.
+	for (unsigned short x = 0; x < AnimationEntries; x++)
+	{
+		unsigned int AnimationNameOffsetBigEndian = LittleToBigEndian32(ShadowObjects[x].AnimationNameOffset);
+		unsigned int AnimationDataOffsetBigEndian = LittleToBigEndian32(ShadowObjects[x].AnimationDataOffset);
+		unsigned int AnimationPropertyOffsetBigEndian = LittleToBigEndian32(ShadowObjects[x].AnimationPropertyOffset);
+		FileWriter.write( (char*)&AnimationNameOffsetBigEndian, 4);
+		FileWriter.write( (char*)&AnimationDataOffsetBigEndian, 4);
+		FileWriter.write( (char*)&AnimationPropertyOffsetBigEndian, 4);
+	}
+	
+
+	cout << "=> Writing The Filename Array!" << endl;
+	// Write the filename array // 
+	for (unsigned short x = 0; x < AnimationEntries; x++)
+	{
+		unsigned short NullBytes = ShadowObjects[x].AnimationNameNullBytes;
+		FileWriter << ShadowObjects[x].AnimationNameRaw;
+		//FileWriter.write( (char*)&ShadowObjects[x].AnimationNameRaw, ShadowObjects[x].AnimationNameRaw.length());
+		for (unsigned short x = 0; x < NullBytes; x++) 
+		{ 
+			FileWriter.write( (char*)&HeaderNullBytes, 1); 
+		} 
+	}
+
+	cout << "=> Writing The File Data!" << endl;
+	// Write the data array. //
+	for (unsigned short x = 0; x < AnimationEntries; x++)
+	{
+		char* TemporaryDataArray; TemporaryDataArray = new char[ShadowObjects[x].AnimationDataSize];
+		unsigned int AnimationDataSizeTemp = ShadowObjects[x].AnimationDataSize;
+		FileReader.open(InputFile + "/" + ShadowObjects[x].AnimationName, ios::binary); // Open the animation file.
+		FileReader.read(TemporaryDataArray, AnimationDataSizeTemp); // Read the data into the array
+
+		for (unsigned int x = 0; x < AnimationDataSizeTemp; x++)
+		{
+			// Push the current byte to file.
+			FileWriter << TemporaryDataArray[x];
+		}
+		FileReader.close();
+	}
+
+	cout << "=> Writing The Property Array!" << endl;
+	// Write the property array //
+	for (unsigned short x = 0; x < AnimationEntries; x++)
+	{
+		string FileString = InputFile + "/" + ShadowObjects[x].AnimationPropertyName;
+		if ( DoesFileExist(FileString) == 0 ) {} // Do nothing if file does not exist.
+		else
+		{
+			char* TemporaryDataArray; TemporaryDataArray = new char[ShadowObjects[x].AnimationPropertySize];
+			unsigned int AnimationDataSizeTemp = ShadowObjects[x].AnimationPropertySize;
+			FileReader.open(InputFile + "/" + ShadowObjects[x].AnimationPropertyName, ios::binary); // Open the animation file.
+			FileReader.read(TemporaryDataArray, AnimationDataSizeTemp); // Read the data into the array
+
+			for (unsigned int x = 0; x < AnimationDataSizeTemp; x++)
+			{
+				// Push the current byte to file.
+				FileWriter << TemporaryDataArray[x];
+			}
+			FileReader.close();
+		}
+		
+	}
+
 }
 
 // --------------------

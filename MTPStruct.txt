@@ -6,10 +6,14 @@
 Unknown #1 (Activator?) | 2 bytes   (Generally 00 01)
 Animation Count 	 | 2 bytes
 Unknown #2 (Activator?) | 2 bytes   (Generally 00 01)
-Padding 			 | 0xA bytes 
+
+Padding 			 | 0xA bytes ## EDIT: NO PADDING, IT'S THE FIRST BLANK ENTRY.
+								 ## PS. If the program ever breaks it's because of this entry!
 
 >> DATA INFO/OFFSET TABLE (Starting at 0x10), This repeats for Animation Count Entries <<
 
+Animation Name Offset | 4 Bytes
+Animation Size Offset | 4 Bytes
 Object Property Offset | 4 Bytes ## THIS IS AN OFFSET TO BEGINNING OF THE PREVIOUS! PROPERTY.
 							     ## FOR THE FIRST PROPERTY, IT IS THE LENGTH OF THE SPECIFIC PROPERTY AT START OF MISC PROPERTIES.
 								 ## WTF SANIC TEEM, THIS FORMAT IS A CLUSTERFUCK TO PROPERLY UNPACK/PACK. HOW DO YOU EVEN READ THIS YOURSELF
@@ -18,8 +22,11 @@ Object Property Offset | 4 Bytes ## THIS IS AN OFFSET TO BEGINNING OF THE PREVIO
 								 
 								 ## Edit: Seems I was wrong, it's just that the first entry is 'special' in unprecendented ways!
 								 ## It's even padded with 00 00 00 00 at the end.
-Animation Name Offset | 4 Bytes
-Animation Size Offset | 4 Bytes
+								 ## But buahahahhahahahahah! The way I written my decompressor in the first way... a few hacks here and there...
+								 ## and it extracts it all correctly anyway! (With all samples tested)
+								 
+								 ## PS. This was originally first in this table, but I moved here such that it is indeed correct now.
+								 ## PS. The repacker will do the job properly.
 
 >> ANIMATION ENTRY (FROM OFFSET) << 
 Animation Start | 0x0
@@ -66,3 +73,10 @@ Third Values (99% Time): 00 01 00 04 00 00 FF FF
 ----------------
 
 This should be enough to write an unpacker/repacker, which is what I'm doing this very moment.
+
+
+
+
+
+
+1916 + 0 + 0
