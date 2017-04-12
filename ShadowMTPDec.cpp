@@ -1,6 +1,6 @@
 /*
 	HeroesBLK, my third C++ program, utility to decompress Shadow The Hedgehog's
-	Motion Packages .MTP, archives into raw Renderware .anm(s).
+	Motion Packages .MTP, archives into raw non-Renderware .anm(s).
     Copyright (C) 2017  Sewer56lol
 
     This program is free software: you can redistribute it and/or modify
@@ -32,6 +32,8 @@
 //#include "byteswap.h" //Woot, mah endians m8
 
 using namespace std; //Standard Namespace
+
+// Search OLDBroken for OLD code for previous struct
 
 class ShadowANMObject
 {
@@ -189,11 +191,15 @@ void MTPToANM(string InputFile, string OutputFile) {
 	cout << "Shadow MotionPackage Animations Count: " << AnimationEntries << endl;
 
 	// Start the CurrentAnimationPointerLocation at 0x10; Where Animation Entries begin.
-	unsigned int CurrentAnimationLocation = 0x10;
+	unsigned int CurrentAnimationLocation = 8;
+
+	// OLDBROKEN: unsigned int CurrentAnimationLocation = 0x10;
 
 	// For each animation entry in .MTP
 	// This is the main information extraction loop.
-	for(unsigned int x = 0; x < AnimationEntries;)
+
+	// OLDBROKEN: Used to be AnimationEntries + 0, but file header skimps on 1st prop.
+	for(unsigned int x = 0; x < AnimationEntries + 1;)
 	{
 		cout << "\n =>> Animation: " << x << endl;
 		ShadowANMObject* TemporaryShadowObject = new ShadowANMObject();
@@ -205,26 +211,27 @@ void MTPToANM(string InputFile, string OutputFile) {
 		FourByteBuffer[1] = MTPFileData[CurrentAnimationLocation + 2];
 		FourByteBuffer[2] = MTPFileData[CurrentAnimationLocation + 1];
 		FourByteBuffer[3] = MTPFileData[CurrentAnimationLocation + 0];
-		TemporaryShadowObject -> AnimationPropertyOffset = *(unsigned int *)FourByteBuffer;
+		TemporaryShadowObject -> AnimationNameOffset = *(unsigned int *)FourByteBuffer; // OLDBROKEN: TemporaryShadowObject -> AnimationPropertyOffset = *(unsigned int *)FourByteBuffer;
+		
 
 		/* Get the Animation Name Offset */
 		FourByteBuffer[0] = MTPFileData[CurrentAnimationLocation + 7];
 		FourByteBuffer[1] = MTPFileData[CurrentAnimationLocation + 6];
 		FourByteBuffer[2] = MTPFileData[CurrentAnimationLocation + 5];
 		FourByteBuffer[3] = MTPFileData[CurrentAnimationLocation + 4];
-		TemporaryShadowObject -> AnimationNameOffset = *(unsigned int *)FourByteBuffer;
+		TemporaryShadowObject -> AnimationDataOffset = *(unsigned int *)FourByteBuffer; // OLDBROKEN: TemporaryShadowObject -> AnimationNameOffset = *(unsigned int *)FourByteBuffer
 
 		/* Get the Animation Data Offset */
 		FourByteBuffer[0] = MTPFileData[CurrentAnimationLocation + 11];
 		FourByteBuffer[1] = MTPFileData[CurrentAnimationLocation + 10];
 		FourByteBuffer[2] = MTPFileData[CurrentAnimationLocation + 9];
 		FourByteBuffer[3] = MTPFileData[CurrentAnimationLocation + 8];
-		TemporaryShadowObject -> AnimationDataOffset = *(unsigned int *)FourByteBuffer;
+		TemporaryShadowObject -> AnimationPropertyOffset = *(unsigned int *)FourByteBuffer; // OLDBROKEN: TemporaryShadowObject -> AnimationDataOffset = *(unsigned int *)FourByteBuffer
 
 		/* Print Details of Object */
-		cout << "Archive Property Offset: " << TemporaryShadowObject -> AnimationPropertyOffset << endl;
 		cout << "Animation Name Offset: " << TemporaryShadowObject -> AnimationNameOffset << endl;
 		cout << "Animation Data Offset: " << TemporaryShadowObject -> AnimationDataOffset << endl;
+		cout << "Archive Property Offset: " << TemporaryShadowObject -> AnimationPropertyOffset << endl;
 
 		/* Resolve Data Size Of File */
 		/*
@@ -305,29 +312,35 @@ void MTPToANM(string InputFile, string OutputFile) {
 	unsigned int VectorLength = ShadowObjects.size(); // Gets length of the vector, no of entries.
 	unsigned int PropertyStartOffset = ShadowObjects[VectorLength - 1].AnimationDataOffset + ShadowObjects[VectorLength - 1].AnimationDataSize; // Where the property section starts.
 
-	/* Set 1st to correct offset (now being 1st property) */
-	ShadowObjects[0].AnimationPropertyOffset = PropertyStartOffset;
-	cout << "Animation Name for 1st Property (Above list starts from last): " << ShadowObjects[0].AnimationName << endl;
-	cout << "New Offset: " << ShadowObjects[0].AnimationPropertyOffset << endl;
+	/* Set 1st to correct offset (now being 1st property) */ // OLDBROKEN
+	/* 
+		ShadowObjects[0].AnimationPropertyOffset = PropertyStartOffset;
+		cout << "Animation Name for 1st Property (Above list starts from last): " << ShadowObjects[0].AnimationName << endl;
+		cout << "New Offset: " << ShadowObjects[0].AnimationPropertyOffset << endl;
+	*/
 
 	/* Fix Animation Property Offsets For Writing */
-	/* This is done by shifting all of the offsets down, i.e. next is previous, except for 1st */
-	for (unsigned int x = 1; x < VectorLength;) // Ignore 1st entry
-	{
-		ShadowObjects[x].AnimationPropertyOffset = ShadowObjects[x + 1].AnimationPropertyOffset; // Shift down by 1
-		x++;
-	}
+	/* This is done by shifting all of the offsets down, i.e. next is previous, except for 1st */ // OLDBROKEN
+	/*
+		for (unsigned int x = 1; x < VectorLength;) // Ignore 1st entry
+		{
+			ShadowObjects[x].AnimationPropertyOffset = ShadowObjects[x + 1].AnimationPropertyOffset; // Shift down by 1
+			x++;
+		}
+	*/
 	
 	/* Removes first invalid entry after shift */
-	for (unsigned int x = 1; x < VectorLength;) // Ignore 1st entry
-	{
-		if (ShadowObjects[x].AnimationPropertyOffset != 0)
+	/* 	
+		for (unsigned int x = 1; x < VectorLength;) // Ignore 1st entry // OLDBROKEN
 		{
-			ShadowObjects[x].AnimationPropertyOffset = 0; // Remove false entry without property post shift.
-			break;
+			if (ShadowObjects[x].AnimationPropertyOffset != 0)
+			{
+				ShadowObjects[x].AnimationPropertyOffset = 0; // Remove false entry without property post shift.
+				break;
+			}
+			x++;
 		}
-		x++;
-	}
+	*/
 		
 	/* Calculate lengths of object properties */
 	for(unsigned int x = 0; x <= VectorLength;)
@@ -347,6 +360,8 @@ void MTPToANM(string InputFile, string OutputFile) {
 
 					// Size = difference between this and next offset.
 					ShadowObjects[x].AnimationPropertySize = Delta;
+					//cout << "AnimPropName: " << ShadowObjects[x].AnimationPropertyName << endl;
+					//cout << "AnimPropSize: " << ShadowObjects[x].AnimationPropertySize << endl;
 					break;
 				}
 
@@ -358,9 +373,14 @@ void MTPToANM(string InputFile, string OutputFile) {
 		x++;
 	}
 
+	// Set the length of the last object to be from offset till end
+	ShadowObjects[VectorLength - 1].AnimationPropertySize = FileSize - ShadowObjects[VectorLength - 1].AnimationPropertyOffset;  
+
 	// Seek start address, right after last mapped object.
-	unsigned int SeekStartAddress = ShadowObjects[VectorLength - 3].AnimationPropertyOffset + ShadowObjects[VectorLength - 3].AnimationPropertySize;
+	//unsigned int SeekStartAddress = ShadowObjects[VectorLength - 3].AnimationPropertyOffset + ShadowObjects[VectorLength - 3].AnimationPropertySize;
 	/* Manually seek for last two objects */
+	// OLDBROKEN
+	/*
 	for (unsigned int x = VectorLength - 2; x < VectorLength;) // For last 2 objects || -2 because zero index.
 	{
 
@@ -387,6 +407,7 @@ void MTPToANM(string InputFile, string OutputFile) {
 
 		x++; // Go to next object!
 	}
+	*/
 	
 
 	/* This section is responsible for writing the animation files! */
@@ -433,6 +454,12 @@ void MTPToANM(string InputFile, string OutputFile) {
 
 	// Add a line between files and properties.
 	ANMDecTextFile << endl;
+
+	/* Fix | Swap Animation Property Length and Property Offset for 1st Value */
+	unsigned int TempSizeProperty = ShadowObjects[0].AnimationPropertyOffset;
+	ShadowObjects[0].AnimationPropertyOffset = ShadowObjects[0].AnimationPropertySize;
+	ShadowObjects[0].AnimationPropertySize = TempSizeProperty; // This "object" does not have a size, it is a pointer to the table of properties, I'm only treating it as one so it doesn't feel lonely.
+															   // In order to not rewrite code, I'll dump the offset of this as bytes of equal length.
 
 	/* I know it's literally the same loop, and I'm wasting cycles, it's just that I'd rather keep Properties separate for readability, and for writing the properties files, and the text file in desired order, and I'm lazy */
 	for (auto &ShadowANMObject : ShadowObjects)
@@ -575,7 +602,7 @@ void FolderToMTP(string InputFile, string OutputFile)
 	// Check if file successfully written.
 	if (FileWriter.is_open()) { cout << "File successfully created for writing.\n" << endl; } else { cout << "File failed to open for writing" << endl; std::exit; }
 	// Activator for header
-	AnimationEntries += 1; // Part of the hacky implementation, see below!
+	//AnimationEntries += 1; // Part of the hacky implementation, see below! OLDBROKEN
 	unsigned const short MTPArchiveActivator = 0x01;
 	unsigned const short MTPArchiveActivatorBigEndian = LittleToBigEndian16(MTPArchiveActivator);
 	unsigned const short AnimationInfoEntryOffset = 12;
@@ -588,15 +615,18 @@ void FolderToMTP(string InputFile, string OutputFile)
 	/* Calculate the File Format Offsets Before Writing */
 
 	/* Starting off With a HACKY Implementation to fix a HACKY implementation, god bless! */
-	ShadowANMObject* TemporaryObjectX = new ShadowANMObject();
-	TemporaryObjectX->AnimationPropertySize = ShadowObjects[0].AnimationPropertySize;
-	TemporaryObjectX->AnimationPropertyName = ShadowObjects[0].AnimationPropertyName;
-	ShadowObjects[0].AnimationPropertySize = 0;
-	ShadowObjects[0].AnimationPropertyName = "";
-	TemporaryObjectX->AnimationDataOffset = 0;
-	TemporaryObjectX->AnimationNameOffset = 0;
-	TemporaryObjectX->AnimationDataSize = 0;
-	ShadowObjects.insert( ShadowObjects.begin(), *(ShadowANMObject *)TemporaryObjectX );
+	// This is now all OLDBROKEN.... HAHAHHAHAHAHHAHAHAHHAHAHAHAHAHAHAHAHAHAHAHAH
+	/*
+		ShadowANMObject* TemporaryObjectX = new ShadowANMObject();
+		TemporaryObjectX->AnimationPropertySize = ShadowObjects[0].AnimationPropertySize;
+		TemporaryObjectX->AnimationPropertyName = ShadowObjects[0].AnimationPropertyName;
+		ShadowObjects[0].AnimationPropertySize = 0;
+		ShadowObjects[0].AnimationPropertyName = "";
+		TemporaryObjectX->AnimationDataOffset = 0;
+		TemporaryObjectX->AnimationNameOffset = 0;
+		TemporaryObjectX->AnimationDataSize = 0;
+		ShadowObjects.insert( ShadowObjects.begin(), *(ShadowANMObject *)TemporaryObjectX );
+	*/
 	
 	/* We can start calculating the offsets now */
 	NameSectionStart = (AnimationInfoEntryOffset * AnimationEntries) + AnimationInfoTableStart;
@@ -635,9 +665,10 @@ void FolderToMTP(string InputFile, string OutputFile)
 
 	DataSectionStart = ShadowObjects[AnimationEntries - 1].AnimationNameOffset + ShadowObjects[AnimationEntries - 1].AnimationNameLength + ShadowObjects[AnimationEntries - 1].AnimationNameNullBytes;
 
+	/* Calculating Data Offsets! */
 	for (unsigned int x = 0; x < AnimationEntries; x++)
 	{
-		/* Calculating Data Offsets! */
+		
 		if (x == 0) { ShadowObjects[x].AnimationDataOffset = DataSectionStart; }
 													
 		else { ShadowObjects[x].AnimationDataOffset = ShadowObjects[x - 1].AnimationDataOffset + ShadowObjects[x - 1].AnimationDataSize; }
@@ -645,10 +676,10 @@ void FolderToMTP(string InputFile, string OutputFile)
 
 	PropertySectionStart = ShadowObjects[AnimationEntries - 1].AnimationDataOffset + ShadowObjects[AnimationEntries - 1].AnimationDataSize;
 
+	/* Calculating Property Offsets! */
 	for (unsigned int x = 0; x < AnimationEntries; x++)
 	{
-		/* Calculating Data Offsets! */
-		if (x == 0) { ShadowObjects[x].AnimationPropertyOffset = PropertySectionStart; }
+		if (x == 1) { ShadowObjects[x].AnimationPropertyOffset = PropertySectionStart; }
 													
 		else { ShadowObjects[x].AnimationPropertyOffset = ShadowObjects[x - 1].AnimationPropertyOffset + ShadowObjects[x - 1].AnimationPropertySize; }
 	}
@@ -746,7 +777,9 @@ void FolderToMTP(string InputFile, string OutputFile)
 	for (unsigned short x = 0; x < AnimationEntries; x++)
 	{
 		string FileString = InputFile + "/" + ShadowObjects[x].AnimationPropertyName;
-		if ( DoesFileExist(FileString) == 0 ) {} // Do nothing if file does not exist.
+		// This is the table pointer, the table pointer contains no data, because it is so similar, I am simply not writing the property data so I can treat is as an object here, it doesn't contain any actual data, even if dumped.
+		if (x == 0) { } 
+		else if ( DoesFileExist(FileString) == 0 ) {} // Do nothing if file does not exist.
 		else
 		{
 			char* TemporaryDataArray; TemporaryDataArray = new char[ShadowObjects[x].AnimationPropertySize];
@@ -754,10 +787,10 @@ void FolderToMTP(string InputFile, string OutputFile)
 			FileReader.open(InputFile + "/" + ShadowObjects[x].AnimationPropertyName, ios::binary); // Open the animation file.
 			FileReader.read(TemporaryDataArray, AnimationDataSizeTemp); // Read the data into the array
 
-			for (unsigned int x = 0; x < AnimationDataSizeTemp; x++)
+			for (unsigned int y = 0; y < AnimationDataSizeTemp; y++)
 			{
 				// Push the current byte to file.
-				FileWriter << TemporaryDataArray[x];
+				FileWriter << TemporaryDataArray[y];
 			}
 			FileReader.close();
 		}

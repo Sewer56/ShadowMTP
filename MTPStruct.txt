@@ -9,11 +9,12 @@ Unknown #2 (Activator?) | 2 bytes   (Generally 00 01)
 
 Padding 			 | 0xA bytes ## EDIT: NO PADDING, IT'S THE FIRST BLANK ENTRY.
 								 ## PS. If the program ever breaks it's because of this entry!
+								 ## This is a pointer to the table of actual values, 12 bytes long. No problemo!
 
 >> DATA INFO/OFFSET TABLE (Starting at 0x10), This repeats for Animation Count Entries <<
 
 Animation Name Offset | 4 Bytes
-Animation Size Offset | 4 Bytes
+Animation Data Offset | 4 Bytes
 Object Property Offset | 4 Bytes ## THIS IS AN OFFSET TO BEGINNING OF THE PREVIOUS! PROPERTY.
 							     ## FOR THE FIRST PROPERTY, IT IS THE LENGTH OF THE SPECIFIC PROPERTY AT START OF MISC PROPERTIES.
 								 ## WTF SANIC TEEM, THIS FORMAT IS A CLUSTERFUCK TO PROPERLY UNPACK/PACK. HOW DO YOU EVEN READ THIS YOURSELF
